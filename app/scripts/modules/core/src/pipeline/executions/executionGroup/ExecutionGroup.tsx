@@ -230,6 +230,10 @@ export class ExecutionGroup extends React.PureComponent<IExecutionGroupProps, IE
       .filter(a => !!a);
   }
 
+  private rerenderCallback = (): void => {
+    this.forceUpdate();
+  }
+
   private renderExecutions() {
     const { pipelineConfig } = this.state;
     const { executions } = this.props.group;
@@ -252,6 +256,8 @@ export class ExecutionGroup extends React.PureComponent<IExecutionGroupProps, IE
             pipelineConfig={pipelineConfig}
             application={this.props.application}
             onRerun={pipelineConfig ? this.rerunExecutionClicked : undefined}
+            onPinUnpin={this.rerenderCallback}
+            isPinned={highlightedExecution!==undefined && highlightedExecution.id === execution.id ? true : false}
           />
         ))}
       </>

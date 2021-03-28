@@ -41,9 +41,11 @@ export interface IExecutionProps {
   dataSourceKey?: string;
   showAccountLabels?: boolean;
   onRerun?: (execution: IExecution, config: IPipeline) => void;
+  onPinUnpin?: () => void;
   cancelHelpText?: string;
   cancelConfirmationText?: string;
   scrollIntoView?: boolean; // should really only be set to ensure scrolling on initial page load deep link
+  isPinned?: boolean;
 }
 
 export interface IExecutionState {
@@ -54,6 +56,7 @@ export interface IExecutionState {
   sortFilter: ISortFilter;
   restartDetails: IRestartDetails;
   runningTimeInMs: number;
+  isPinned: boolean;
 }
 
 export class Execution extends React.PureComponent<IExecutionProps, IExecutionState> {
@@ -89,6 +92,7 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
       sortFilter: ExecutionState.filterModel.asFilterModel.sortFilter,
       restartDetails: restartedStage ? restartedStage.context.restartDetails : null,
       runningTimeInMs: props.execution.runningTimeInMs,
+      isPinned: props.isPinned,
     };
   }
 
@@ -208,7 +212,9 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
     ReactInjector.pinExecutionIdModel.pinExecution(execution.pipelineConfigId, execution.id);
 
     // reload the execution group
-
+    this.setState({ isPinned: true } );
+    this.forceUpdate();
+    this.props.onPinUnpin();
   }
 
   public unpinExecution(): void {
@@ -217,6 +223,11 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
 
     // reload the execution group
     ReactInjector.pinExecutionIdModel.unpinExecution(execution.pipelineConfigId);
+
+    // reload the execution group
+    this.setState({ isPinned: false } );
+    this.forceUpdate();
+    this.props.onPinUnpin();
   }
 
   private isPinned = (): boolean => {
@@ -242,6 +253,10 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
       this.setState({
         showingDetails: this.invalidateShowingDetails(nextProps),
       });
+    }
+
+    if (nextProps.isPinned != this.props.isPinned) {
+      this.forceUpdate();
     }
   }
 
