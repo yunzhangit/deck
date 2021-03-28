@@ -41,9 +41,11 @@ export interface IExecutionProps {
   dataSourceKey?: string;
   showAccountLabels?: boolean;
   onRerun?: (execution: IExecution, config: IPipeline) => void;
+  onPinUnpin?: () => void;
   cancelHelpText?: string;
   cancelConfirmationText?: string;
   scrollIntoView?: boolean; // should really only be set to ensure scrolling on initial page load deep link
+  isPinned?: boolean;
 }
 
 export interface IExecutionState {
@@ -54,6 +56,7 @@ export interface IExecutionState {
   sortFilter: ISortFilter;
   restartDetails: IRestartDetails;
   runningTimeInMs: number;
+  isPinned: boolean;
 }
 
 export class Execution extends React.PureComponent<IExecutionProps, IExecutionState> {
@@ -89,6 +92,7 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
       sortFilter: ExecutionState.filterModel.asFilterModel.sortFilter,
       restartDetails: restartedStage ? restartedStage.context.restartDetails : null,
       runningTimeInMs: props.execution.runningTimeInMs,
+      isPinned: props.isPinned,
     };
   }
 
@@ -200,6 +204,37 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
     });
   }
 
+  public pinExecution(): void {
+    // Get the execution id, put the exeuction id in cache
+    const { execution } = this.props;
+
+    // add the execution id in cache at upfront
+    ReactInjector.pinExecutionIdModel.pinExecution(execution.pipelineConfigId, execution.id);
+
+    // reload the execution group
+    this.setState({ isPinned: true } );
+    this.forceUpdate();
+    this.props.onPinUnpin();
+  }
+
+  public unpinExecution(): void {
+    // Get the execution id, remove it from cache
+    const { execution } = this.props;
+
+    // reload the execution group
+    ReactInjector.pinExecutionIdModel.unpinExecution(execution.pipelineConfigId);
+
+    // reload the execution group
+    this.setState({ isPinned: false } );
+    this.forceUpdate();
+    this.props.onPinUnpin();
+  }
+
+  private isPinned = (): boolean => {
+    const { execution } = this.props;
+    return ReactInjector.pinExecutionIdModel.isPinned(execution.pipelineConfigId, execution.id);
+  }
+
   public componentDidMount(): void {
     const { execution } = this.props;
     this.runningTime = new OrchestratedItemRunningTime(execution, (time: number) =>
@@ -219,6 +254,10 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
         showingDetails: this.invalidateShowingDetails(nextProps),
       });
     }
+
+    if (nextProps.isPinned != this.props.isPinned) {
+      this.forceUpdate();
+    }
   }
 
   public componentWillUnmount(): void {
@@ -232,6 +271,16 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
 
   private handleSourceNoStagesClick = (): void => {
     ReactGA.event({ category: 'Pipeline', action: 'Execution source clicked (no stages found)' });
+  };
+
+  private handlePinClick = (): void => {
+    ReactGA.event({ category: 'Pipeline', action: 'Execution pinned to top' });
+    this.pinExecution();
+  };
+
+  private handleUnpinClick = (): void => {
+    ReactGA.event({ category: 'Pipeline', action: 'Execution unpinned' });
+    this.unpinExecution();
   };
 
   private handlePauseClick = (): void => {
@@ -285,6 +334,14 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
       });
   };
 
+  private executionOverviewStyle = (): string => {
+    if (this.isPinned()) {
+      return "execution-overview-highlight";
+    } else {
+      return "execution-overview"
+    }
+  };
+
   public render() {
     const {
       application,
@@ -327,7 +384,7 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
 
     return (
       <div className={className} id={`execution-${execution.id}`} ref={this.wrapperRef}>
-        <div className={`execution-overview group-by-${sortFilter.groupBy}`}>
+        <div className={`${this.executionOverviewStyle()} group-by-${sortFilter.groupBy}`}>
           {(title || showExecutionName) && (
             <h4 className="execution-name">
               {(showAccountLabels || showExecutionName) && accountLabels}
@@ -402,7 +459,7 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
               </Tooltip>
             )}
             {(!execution.isActive || application.attributes.enableRerunActiveExecutions) && this.props.onRerun && (
-              <Tooltip value="Re-run execution with same parameters">
+              <Tooltip value="Test: Re-run execution with same parameters">
                 <button className="link" onClick={this.handleRerunClick}>
                   <i className="fa fa-redo" />
                 </button>
@@ -419,6 +476,20 @@ export class Execution extends React.PureComponent<IExecutionProps, IExecutionSt
               <Tooltip value={cancelHelpText}>
                 <button className="link" onClick={this.handleCancelClick}>
                   <i className="far fa-times-circle" />
+                </button>
+              </Tooltip>
+            )}
+            {!this.isPinned() && (
+              <Tooltip value="Put execution on top">
+                <button className="link" onClick={this.handlePinClick}>
+                  <span className="glyphicon glyphicon-star-empty" />
+                </button>
+              </Tooltip>
+            )}
+            {this.isPinned() && (
+              <Tooltip value="Unpin execution">
+                <button className="link" onClick={this.handleUnpinClick}>
+                  <span className="glyphicon glyphicon-star" />
                 </button>
               </Tooltip>
             )}

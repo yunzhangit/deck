@@ -230,18 +230,34 @@ export class ExecutionGroup extends React.PureComponent<IExecutionGroupProps, IE
       .filter(a => !!a);
   }
 
+  private rerenderCallback = (): void => {
+    this.forceUpdate();
+  }
+
   private renderExecutions() {
     const { pipelineConfig } = this.state;
     const { executions } = this.props.group;
+    let executionReordered = executions;
+
+    // Reorder executions to put pinned execution to the beginning
+    const highlightedExecution = executions.find(
+      e => e.id === ReactInjector.pinExecutionIdModel.getPinnedExecution(pipelineConfig.id))
+    if (highlightedExecution !== undefined) {
+      executionReordered = executions.filter( e => e.id !== highlightedExecution.id);
+      executionReordered.unshift(highlightedExecution);
+    }
+
     return (
       <>
-        {executions.map(execution => (
+        {executionReordered.map(execution => (
           <Execution
             key={execution.id}
             execution={execution}
             pipelineConfig={pipelineConfig}
             application={this.props.application}
             onRerun={pipelineConfig ? this.rerunExecutionClicked : undefined}
+            onPinUnpin={this.rerenderCallback}
+            isPinned={highlightedExecution!==undefined && highlightedExecution.id === execution.id ? true : false}
           />
         ))}
       </>
